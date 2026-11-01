@@ -97,6 +97,17 @@ display:flex;gap:9px;align-items:center;justify-content:center;flex-wrap:wrap}
 padding:11px 20px;font:700 15px inherit;cursor:pointer;min-height:46px}
 .dock .send:hover{background:#1eb457}
 .dockstat{font-size:12.5px;color:var(--dim);flex-basis:100%;text-align:center}
+
+/* מצב צפייה בתיקונים — נפתח מהקישור שבהודעת הוואטסאפ */
+.rvbar{position:sticky;top:0;z-index:8;display:flex;flex-wrap:wrap;align-items:center;gap:6px 12px;
+background:var(--editbg);border:1px solid var(--editline);border-radius:12px;padding:12px 16px;
+margin:0 0 24px;box-shadow:0 2px 8px rgba(14,24,54,.08)}
+.rvbar b{color:var(--edit);font-size:15px}
+.rvbar span{flex:1 1 260px;font-size:13.5px;color:var(--body)}
+body.review{padding-bottom:40px}
+body.review .hint,body.review .dock,body.review .b-edit,body.review .b-reset,body.review .undo{display:none}
+body.review .pick{cursor:default}
+p.vo .was{display:block;font-size:13px;line-height:1.6;color:var(--dim);margin-top:3px}
 @media(max-width:600px){
   body{padding:22px 13px 116px}
   h1{font-size:22px}
@@ -107,6 +118,7 @@ padding:11px 20px;font:700 15px inherit;cursor:pointer;min-height:46px}
   .bar .btn{flex:1 1 auto;text-align:center}
   .dock{padding:10px 12px}
   .dock .send{flex:1 1 100%}
+  .rvbar{position:static;padding:11px 13px}
 }
 @media print{.dock,.pick{display:none}}
 </style></head><body data-doc="sderot-lion-vo" data-name="האריה של שדרות"><div class="wrap">
@@ -227,7 +239,7 @@ padding:11px 20px;font:700 15px inherit;cursor:pointer;min-height:46px}
         host(el).classList.toggle('dirty', changed);
         if (changed) n++;
       });
-      count.textContent = n ? ('✎ ' + n + ' שינויים') : '';
+      count.textContent = n > 1 ? ('✎ ' + n + ' שינויים') : n ? '✎ שינוי אחד' : '';
       return n;
     }
 
@@ -384,7 +396,132 @@ padding:11px 20px;font:700 15px inherit;cursor:pointer;min-height:46px}
       out.push('');
     });
     if (!out.length) return null;
-    return 'הערות לקריינות · ' + (document.body.dataset.name || 'פארק הנצח רמת השרון') + NL + NL + out.join(NL).trim();
+    var L = link();
+    return 'הערות לקריינות · ' + (document.body.dataset.name || 'פארק הנצח רמת השרון') + NL + NL + out.join(NL).trim() +
+           (L ? NL + NL + 'לראות את כל התיקונים בתוך הדף:' + NL + L : '');
+  }
+
+  /* קישור צפייה (שחר, 1.11.2026: "שנראה את התיקונים של הלקוח בתוך הקובץ שהוא השאיר").
+     הדף סטטי ואין שרת, לכן התיקונים עצמם נארזים לתוך הקישור, אחרי ה-# (החלק הזה
+     לא נשלח לשרת בכלל). פתיחת הקישור = אותו דף, עם התיקונים מסומנים בכתום והנוסח
+     המקורי מתחת לכל שורה. נדחס כדי לא לנפח את קישור הוואטסאפ (ראו הערה למעלה). */
+  function state() {
+    var d = { p: LSget(PK) || '', v: {} }, any = false;
+    vers.forEach(function (s) {
+      var e = {}, n = 0;
+      s.querySelectorAll('[data-id]').forEach(function (el) {
+        var now = tx(el);
+        if (now !== el.dataset.orig) { e[el.dataset.id] = now; n++; }
+      });
+      var ta = s.querySelector('textarea'), note = ta && ta.value.trim();
+      if (n || note) { d.v[s.dataset.key] = { e: e, n: note || '' }; any = true; }
+    });
+    return (any || d.p) ? d : null;
+  }
+  function b64u(b) {
+    var s = '';
+    for (var i = 0; i < b.length; i++) s += String.fromCharCode(b[i]);
+    return btoa(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  }
+  function unb64u(t) {
+    var s = atob(t.replace(/-/g, '+').replace(/_/g, '/')), b = new Uint8Array(s.length);
+    for (var i = 0; i < s.length; i++) b[i] = s.charCodeAt(i);
+    return b;
+  }
+  function pipe(bytes, Stream) {
+    return new Response(new Blob([bytes]).stream().pipeThrough(new Stream('deflate-raw')))
+      .arrayBuffer().then(function (a) { return new Uint8Array(a); });
+  }
+  /* הדחיסה אסינכרונית, אבל window.open חייב לרוץ מיד בלחיצה (ספארי חוסם אחרי המתנה) —
+     לכן אורזים מראש אחרי כל שינוי, ואם האריזה עוד לא מוכנה נופלים לגרסה לא דחוסה. */
+  var packed = '', packedFor = '', rt;
+  function repack() {
+    var d = state(), json = d ? JSON.stringify(d) : '';
+    if (!json || !window.CompressionStream) return;
+    pipe(new TextEncoder().encode(json), CompressionStream)
+      .then(function (z) { packed = 'z' + b64u(z); packedFor = json; }).catch(function () {});
+  }
+  ['input', 'change', 'click'].forEach(function (ev) {
+    document.addEventListener(ev, function () { clearTimeout(rt); rt = setTimeout(repack, 250); });
+  });
+  repack();
+  function link() {
+    var d = state();
+    if (!d) return '';
+    var json = JSON.stringify(d);
+    return location.origin + location.pathname + '#c=' +
+           (packedFor === json ? packed : 'u' + b64u(new TextEncoder().encode(json)));
+  }
+
+  function banner(head, sub) {
+    var b = document.createElement('div');
+    b.className = 'rvbar';
+    b.innerHTML = '<b></b><span></span><button class="btn" type="button">לדף הנקי</button>';
+    b.querySelector('b').textContent = head;
+    b.querySelector('span').textContent = sub || '';
+    b.querySelector('button').addEventListener('click', function () { location.replace(location.pathname); });
+    var w = document.querySelector('.wrap');
+    w.insertBefore(b, w.firstChild);
+  }
+  /* מציג את התיקונים מהקישור. לא נוגע ב-localStorage: אין אירועי input, ההערות לקריאה
+     בלבד והכפתורים מוסתרים — כך העריכות של מי שצופה לא נדרסות ולא מתערבבות. */
+  function review(d) {
+    document.body.classList.add('review');
+    var shown = 0, miss = 0;
+    vers.forEach(function (s) {
+      var got = d.v[s.dataset.key], n = 0;
+      s.querySelectorAll('[data-id]').forEach(function (el) {
+        el.textContent = el.dataset.orig;
+        el.parentNode.classList.remove('dirty');
+      });
+      if (got) Object.keys(got.e).forEach(function (id) {
+        var el = s.querySelector('[data-id="' + id + '"]');
+        if (!el) return;
+        el.textContent = got.e[id];
+        var h = el.parentNode;
+        h.classList.add('dirty');
+        if (h.tagName === 'P') {
+          var w = document.createElement('span');
+          w.className = 'was';
+          w.textContent = 'במקור: ' + el.dataset.orig;
+          h.appendChild(w);
+        } else {
+          h.title = 'במקור: ' + el.dataset.orig;
+        }
+        n++;
+      });
+      var ta = s.querySelector('textarea');
+      if (ta) { ta.value = got ? got.n : ''; ta.readOnly = true; ta.placeholder = 'אין הערות לגרסה הזו'; }
+      var c = s.querySelector('.bcount');
+      if (c) c.textContent = n > 1 ? ('✎ ' + n + ' שינויים') : n ? '✎ שינוי אחד' : '';
+      var cb = s.querySelector('.pick input');
+      if (cb) cb.disabled = true;
+      shown += n;
+    });
+    Object.keys(d.v).forEach(function (k) {
+      if (!vers.some(function (s) { return s.dataset.key === k; })) miss++;
+    });
+    paintPick(d.p || '');
+    var fav = vers.filter(function (s) { return s.dataset.key === d.p; })[0];
+    var sub = (shown > 1 ? shown + ' שורות שונו — מסומנות בכתום, והנוסח המקורי מתחת לכל שורה.'
+               : shown ? 'שורה אחת שונתה — מסומנת בכתום, והנוסח המקורי מתחתיה.' : 'לא שונו שורות.') +
+              (fav ? ' הגרסה המועדפת: ' + fav.querySelector('.vletter').textContent.trim() + '.' : '') +
+              (miss ? ' חלק מהתיקונים נכתבו על נוסח קודם של הדף ולא מוצגים כאן — הם מופיעים ברשימה שבהודעה.' : '');
+    banner('צפייה בתיקונים שנשלחו', sub);
+    window.scrollTo(0, 0);
+  }
+  var hm = /^#c=([uz])([A-Za-z0-9_-]+)$/.exec(location.hash);
+  if (hm) {
+    /* רענון לא מחזיר לאמצע הדף מתחת לבאנר — חייב לקרות לפני טעינת הדף */
+    try { history.scrollRestoration = 'manual'; } catch (e) {}
+    try {
+      var raw = unb64u(hm[2]);
+      (hm[1] === 'z' ? pipe(raw, DecompressionStream) : Promise.resolve(raw))
+        .then(function (b) { review(JSON.parse(new TextDecoder().decode(b))); })
+        .catch(function () { banner('אי אפשר להציג את התיקונים', 'הקישור חתוך או פגום. הרשימה המלאה של התיקונים נמצאת בהודעה עצמה.'); });
+    } catch (e) {
+      banner('אי אפשר להציג את התיקונים', 'הקישור חתוך או פגום. הרשימה המלאה של התיקונים נמצאת בהודעה עצמה.');
+    }
   }
 
   var dock = document.querySelector('.dock');
