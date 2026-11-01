@@ -121,10 +121,10 @@ p.vo .was{display:block;font-size:13px;line-height:1.6;color:var(--dim);margin-t
   .rvbar{position:static;padding:11px 13px}
 }
 @media print{.dock,.pick{display:none}}
-</style></head><body data-doc="sderot-lion-vo" data-name="האריה של שדרות"><div class="wrap">
+</style></head><body data-doc="sderot-lion-vo" data-name="האריה של שדרות" data-sync="https://script.google.com/macros/s/AKfycbxvZuo5jiirPZ6llDKOKRylahnXJO9X0NC_qeCn96KYSBF18wXaJezHKpmTB9LMa2Sv7Q/exec"><div class="wrap">
 <h1>האריה של שדרות · שלוש קריינויות</h1>
 <p class="sub">כשתי דקות · הכותרות הגרפיות מופיעות משמאל, בשורה שבה הן קופצות</p>
-<div class="hint"><b>אפשר לערוך הכול כאן בדף.</b><ol><li>קוראים את הגרסאות — הקריינות מימין, הכותרות שיופיעו על המסך משמאל.</li><li>"✎ ערכי את הטקסט" פותח את השורות לכתיבה. כל שינוי נשמר מיד ומסומן בכתום.</li><li>אפשר להשאיר הערות חופשיות בסוף כל גרסה, ולסמן את הגרסה המועדפת.</li><li>בסיום — "שליחה בוואטסאפ" למטה. הכול נשמר במכשיר גם בלי לשלוח.</li></ol></div>
+<div class="hint"><b>אפשר לערוך הכול כאן בדף.</b><ol><li>קוראים את הגרסאות — הקריינות מימין, הכותרות שיופיעו על המסך משמאל.</li><li>"✎ ערכי את הטקסט" פותח את השורות לכתיבה. כל שינוי נשמר מיד ומסומן בכתום.</li><li>אפשר להשאיר הערות חופשיות בסוף כל גרסה, ולסמן את הגרסה המועדפת.</li><li>כל שינוי והערה נשמרים ומגיעים אלינו אוטומטית. בסיום אפשר גם ללחוץ "שליחה בוואטסאפ" למטה.</li></ol></div>
 <section class="ver" data-key="vo-א׳-2c7d05b54f">
 <header class="vhead"><div class="vline"><span class="vletter">גרסה א׳</span><h2>"פרק חדש"</h2><span class="tone">חם ומלא חזון · מסע דרך הפארק</span></div><p class="blurb">הפארק מוצג כמסע לפי גילים — מהאריה שבלב הפארק, דרך הקטנים והגדולים ועד ההורים — ומסתיים בשותפות לאורך שנים.</p><p class="meta">‎~252 מילים · ‎~1:55 בקצב קריינות · 13 כותרות</p></header>
 <div class="bar"><button class="btn b-edit" type="button">✎ ערכי את הטקסט</button><button class="btn b-reset" type="button">↩ שחזרי למקור</button><span class="bcount"></span><span class="bstat"></span></div>
@@ -454,6 +454,8 @@ p.vo .was{display:block;font-size:13px;line-height:1.6;color:var(--dim);margin-t
   }
 
   function banner(head, sub) {
+    var old = document.querySelector('.rvbar');
+    if (old) old.parentNode.removeChild(old);
     var b = document.createElement('div');
     b.className = 'rvbar';
     b.innerHTML = '<b></b><span></span><button class="btn" type="button">לדף הנקי</button>';
@@ -462,17 +464,22 @@ p.vo .was{display:block;font-size:13px;line-height:1.6;color:var(--dim);margin-t
     b.querySelector('button').addEventListener('click', function () { location.replace(location.pathname); });
     var w = document.querySelector('.wrap');
     w.insertBefore(b, w.firstChild);
+    return b;
   }
   /* מציג את התיקונים מהקישור. לא נוגע ב-localStorage: אין אירועי input, ההערות לקריאה
      בלבד והכפתורים מוסתרים — כך העריכות של מי שצופה לא נדרסות ולא מתערבבות. */
-  function review(d) {
+  function review(d, head, when) {
     document.body.classList.add('review');
     var shown = 0, miss = 0;
+    d = d || { p: '', v: {} };
     vers.forEach(function (s) {
       var got = d.v[s.dataset.key], n = 0;
       s.querySelectorAll('[data-id]').forEach(function (el) {
+        var h = el.parentNode, w = h.querySelector('.was');
         el.textContent = el.dataset.orig;
-        el.parentNode.classList.remove('dirty');
+        h.classList.remove('dirty');
+        h.removeAttribute('title');
+        if (w) h.removeChild(w);
       });
       if (got) Object.keys(got.e).forEach(function (id) {
         var el = s.querySelector('[data-id="' + id + '"]');
@@ -507,8 +514,85 @@ p.vo .was{display:block;font-size:13px;line-height:1.6;color:var(--dim);margin-t
                : shown ? 'שורה אחת שונתה — מסומנת בכתום, והנוסח המקורי מתחתיה.' : 'לא שונו שורות.') +
               (fav ? ' הגרסה המועדפת: ' + fav.querySelector('.vletter').textContent.trim() + '.' : '') +
               (miss ? ' חלק מהתיקונים נכתבו על נוסח קודם של הדף ולא מוצגים כאן — הם מופיעים ברשימה שבהודעה.' : '');
-    banner('צפייה בתיקונים שנשלחו', sub);
+    var b = banner(head || 'צפייה בתיקונים שנשלחו', (when ? when + ' · ' : '') + sub);
     window.scrollTo(0, 0);
+    return b;
+  }
+
+  /* סנכרון חי (שחר, 1.11.2026: "שאני אראה את העריכה מהלינק אצלי בלי המעבר בוואטסאפ").
+     הדף נשאר סטטי; כל שינוי של מי שעורך נשלח גם לגיליון גוגל שלנו (Apps Script שכתובתו
+     ב-data-sync), שורה אחת לכל מכשיר. אנחנו צופים דרך <page>#live=<מפתח>. המפתח כתוב רק
+     בסקריפט אצלנו ובקישור הפרטי — לא בדף — כך שמי שקורא את הקוד הציבורי לא רואה עריכות. */
+  var SYNC = document.body.dataset.sync || '';
+  var DOC = document.body.dataset.doc || 'doc';
+  var SK = 'nvosent:' + DOC, pt;
+  var DEV = LSget('nvodev');
+  if (!DEV) { DEV = Math.random().toString(36).slice(2, 10) + Date.now().toString(36); LSset('nvodev', DEV); }
+  function push() {
+    if (!SYNC || document.body.classList.contains('review')) return;
+    var d = state(), json = d ? JSON.stringify(d) : '';
+    if (json === (LSget(SK) || '')) return;
+    var body = JSON.stringify({ doc: DOC, device: DEV, data: json,
+      info: /Mobi|Android|iPhone|iPad/.test(navigator.userAgent) ? 'טלפון' : 'מחשב' });
+    try {
+      /* no-cors + גוף טקסט: בלי בדיקה מקדימה של הדפדפן, והשמירה קורית בצד של גוגל גם
+         כשאין לנו גישה לתשובה. מסמנים "נשלח" רק כשהבקשה יצאה בלי שגיאת רשת. */
+      fetch(SYNC, { method: 'POST', mode: 'no-cors', keepalive: true, body: body })
+        .then(function () { LSset(SK, json); }).catch(function () {});
+    } catch (e) {}
+  }
+  if (SYNC) {
+    ['input', 'change', 'click'].forEach(function (ev) {
+      document.addEventListener(ev, function () { clearTimeout(pt); pt = setTimeout(push, 1500); });
+    });
+    document.addEventListener('visibilitychange', function () { if (document.hidden) push(); });
+    push();
+  }
+
+  function when(iso) {
+    var t = new Date(iso);
+    return isNaN(t) ? '' : 'עודכן ' + t.toLocaleString('he-IL', { day: 'numeric', month: 'numeric', hour: '2-digit', minute: '2-digit' });
+  }
+  function live(items, i) {
+    var it = items[i], d;
+    try { d = JSON.parse(it.data); } catch (e) { d = null; }
+    var b = review(d, 'העריכות שנשמרו בדף', when(it.updated));
+    var again = document.createElement('button');
+    again.className = 'btn'; again.type = 'button'; again.textContent = 'רענון';
+    again.addEventListener('click', function () { location.reload(); });
+    b.insertBefore(again, b.lastChild);
+    if (items.length > 1) {
+      var sel = document.createElement('select');
+      sel.className = 'btn';
+      items.forEach(function (x, k) {
+        var o = document.createElement('option');
+        o.value = k;
+        o.textContent = 'מכשיר ' + (k + 1) + (x.info ? ' · ' + x.info : '') + ' · ' + when(x.updated);
+        if (k === i) o.selected = true;
+        sel.appendChild(o);
+      });
+      sel.addEventListener('change', function () { live(items, +sel.value); });
+      b.insertBefore(sel, b.querySelector('.btn'));
+    }
+  }
+  var lv = /^#live=([A-Za-z0-9_-]+)$/.exec(location.hash);
+  if (lv) {
+    try { history.scrollRestoration = 'manual'; } catch (e) {}
+    document.body.classList.add('review');
+    if (!SYNC) {
+      banner('הדף הזה לא מחובר לגיליון', 'אין בו שמירה אוטומטית, ולכן אין עריכות להציג.');
+    } else {
+      banner('טוען את העריכות…', '');
+      fetch(SYNC + '?doc=' + encodeURIComponent(DOC) + '&key=' + lv[1])
+        .then(function (r) { return r.json(); })
+        .then(function (res) {
+          if (!res.ok) { banner('אין גישה', 'המפתח בקישור לא נכון.'); return; }
+          var items = res.items.slice().sort(function (a, b) { return new Date(b.updated) - new Date(a.updated); });
+          if (!items.length) { banner('עוד אין עריכות', 'אף אחד עוד לא ערך את הדף או השאיר בו הערות.'); return; }
+          live(items, 0);
+        })
+        .catch(function () { banner('אי אפשר לטעון את העריכות', 'בדקו את החיבור לאינטרנט ונסו לרענן.'); });
+    }
   }
   var hm = /^#c=([uz])([A-Za-z0-9_-]+)$/.exec(location.hash);
   if (hm) {
@@ -533,6 +617,8 @@ p.vo .was{display:block;font-size:13px;line-height:1.6;color:var(--dim);margin-t
       s.querySelectorAll('[data-id]').forEach(function (el) { if (tx(el) !== el.dataset.orig) n++; });
       var ta = s.querySelector('textarea'); if (ta && ta.value.trim()) n++;
     });
+    if (document.body.dataset.sync)
+      return n ? ('נשמרו ' + n + ' הערות ושינויים — הם מגיעים אלינו אוטומטית') : 'אפשר לערוך את הטקסט ולהשאיר הערות — הכול נשמר ומגיע אלינו אוטומטית';
     return n ? ('נשמרו ' + n + ' הערות ושינויים במכשיר שלך') : 'אפשר לערוך את הטקסט ולהשאיר הערות — הכול נשמר אוטומטית';
   }
   stat.textContent = base();
